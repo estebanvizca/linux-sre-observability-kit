@@ -1,0 +1,29 @@
+{
+  "hardening": "passed: effective SSH configuration, firewall policy, active services and SSH jail",
+  "targets": [
+    {
+      "instance": "127.0.0.1:18081",
+      "job": "cadvisor"
+    },
+    {
+      "instance": "127.0.0.1:19100",
+      "job": "node"
+    },
+    {
+      "instance": "127.0.0.1:9090",
+      "job": "prometheus"
+    },
+    {
+      "instance": "https://github.com",
+      "job": "tls"
+    }
+  ],
+  "https_probe": "probe_success=1",
+  "container_metrics": "named lab container CPU metrics present",
+  "logs": "fresh journal marker retrieved from Loki",
+  "backup_seconds": 2.431,
+  "restore-drill_seconds": 1.299,
+  "recovery_metrics": "backup exit=0 and restore success=1 scraped",
+  "alert_latency_seconds": 75.484,
+  "elapsed_seconds": 101.863
+}

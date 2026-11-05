@@ -4,8 +4,9 @@ A disposable Ubuntu 24.04 VM with Ansible hardening, metrics, logs, alerts,
 encrypted backups, and an isolated restore drill. The monitoring stack runs on
 the Linux operator host; the guest remains a small, independently recoverable server.
 
-**Status:** implementation available; offline configuration checks passed. Live
-acceptance and GitHub CI results are not yet available. See [validation results](docs/results.md).
+**Status:** Docker and QEMU/KVM live acceptance passed on 2026-11-05, including
+backup/restore, log delivery and HostDown firing/resolution. See
+[validation results](docs/results.md) for evidence, CI status and remaining limits.
 
 ## Architecture
 
@@ -97,7 +98,7 @@ additional off-host copy. Review [security](docs/security-checklist.md).
 
 CPU, memory, disk, exporter availability, missing/stale/failed backups, failed
 restores, HTTPS availability and TLS expiry are covered. The example HTTPS target
-is `https://example.com`; edit `monitoring/prometheus/prometheus.yml` for your service.
+is `https://github.com`; edit `monitoring/prometheus/prometheus.yml` for your service.
 See [runbooks](docs/runbook.md), [architecture](docs/architecture.md), and
 [validation results](docs/results.md).
 
@@ -115,11 +116,12 @@ are reproducibility pins, not a claim of current security support.
 CI checks configuration and alert rules; it does not claim KVM integration coverage.
 Read [the original specification](docs/project-specification.es.md) for planned
 acceptance criteria and deferred evidence (fail2ban attack simulation, screenshots,
-full idempotence and live firewall testing).
+resource-pressure alert drills).
 
 ## Publish
 
-After reviewing and committing changes, run `make publish` with GitHub CLI authenticated
+After reviewing and committing changes, run `make publish` (or
+`GH=/path/to/gh make publish`) with GitHub CLI authenticated
 as `estebanvizca`. It creates the public repository if absent and pushes `main` without force.
 GitHub hosts the source and CI; the VM and Docker services run locally, not on GitHub Pages.
 

@@ -65,7 +65,7 @@ require_tools() {
   if [ "${#missing[@]}" -gt 0 ]; then
     die "missing tools: ${missing[*]}"
   fi
-  [ -r /dev/kvm ] || die "/dev/kvm is not readable; KVM is required"
+  [ -r /dev/kvm ] && [ -w /dev/kvm ] || die "/dev/kvm must be readable and writable; KVM is required"
 }
 
 is_running() {

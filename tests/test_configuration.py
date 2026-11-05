@@ -41,6 +41,7 @@ class ConfigurationTests(unittest.TestCase):
                     self.assertIn("127.0.0.1", json.dumps(service))
         loki = yaml.safe_load((ROOT / "monitoring/loki/config.yml").read_text())
         self.assertEqual(loki["server"]["http_listen_address"], "127.0.0.1")
+        self.assertEqual(loki["common"]["instance_addr"], loki["server"]["grpc_listen_address"])
 
     def test_dashboard_datasources_resolve(self):
         sources = yaml.safe_load((ROOT / "monitoring/grafana/provisioning/datasources/default.yml").read_text())

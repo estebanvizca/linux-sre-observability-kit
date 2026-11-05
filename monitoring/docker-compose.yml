@@ -49,7 +49,7 @@ services:
       - restic:/data
     restart: unless-stopped
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: ghcr.io/google/cadvisor:0.60.6
     network_mode: host
     command: ["--listen_ip=127.0.0.1", "--port=18081", "--docker_only=true"]
     privileged: true

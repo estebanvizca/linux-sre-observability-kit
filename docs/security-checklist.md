@@ -11,9 +11,10 @@ Implemented configuration (not a compliance certification):
 - Loopback listeners and ignored local secrets, VM disks and SSH keys.
 - Seven-day metric/log retention and bounded guest journal.
 
-Operational checks still require a live VM: effective sshd policy, firewall
-blocking a real listener, fail2ban ban/unban behavior, second-run idempotence,
-image/config compatibility, fresh log ingestion and restored checksums.
+Live checks of effective sshd policy, firewall blocking a real listener,
+second-run idempotence, image/config compatibility, fresh log ingestion and
+restored checksums are recorded in [validation results](results.md).
+Automatic fail2ban ban/unban behavior has not been exercised.
 
 The administrator has passwordless sudo for this disposable lab. The host's
 Docker group is privileged, and cAdvisor mounts host paths with elevated access.

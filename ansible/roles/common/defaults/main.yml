@@ -1,0 +1,16 @@
+---
+lab_packages:
+  - ca-certificates
+  - curl
+  - jq
+  - htop
+  - unzip
+  - vim-tiny
+  - acl
+  - nftables
+  - fail2ban
+  - python3-systemd
+  - unattended-upgrades
+  - restic
+  - prometheus-node-exporter
+  - stress-ng

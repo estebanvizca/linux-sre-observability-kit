@@ -1,0 +1,12 @@
+# Managed by Ansible.
+[DEFAULT]
+backend = systemd
+bantime = 600
+findtime = 300
+maxretry = 4
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+mode = aggressive
+port = ssh

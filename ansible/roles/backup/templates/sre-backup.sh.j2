@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Managed by Ansible. Backup the lab's configuration, application data and logs
+# to the restic REST server on the operator host, then publish metrics through
+# the node_exporter textfile collector.
+set -euo pipefail
+umask 077
+exec 9>/var/lib/sre/backup.lock
+flock -n 9 || { echo "Another backup or restore is running" >&2; exit 1; }
+# Capture expected content before backup; the drill detects concurrent changes.
+manifest=$(mktemp /var/lib/sre/manifest.XXXXXX)
+trap 'rm -f "$manifest"' EXIT
+while IFS= read -r path; do
+  (cd / && sha256sum "${path#/}") >> "$manifest"
+done < /etc/sre-restore-manifest
+
+set -a
+# shellcheck disable=SC1091
+. /etc/sre-backup.env
+set +a
+
+METRIC_DIR=/var/lib/node_exporter/textfile
+METRIC_FILE="${METRIC_DIR}/backup.prom"
+LOG=/var/log/sre/backup.log
+mkdir -p "${METRIC_DIR}" /var/log/sre
+
+start=$(date +%s)
+set +e
+restic backup \
+{% for path in backup_excludes %}  --exclude {{ path }} \
+{% endfor %}  --tag scheduled \
+  --host {{ lab_hostname }} \
+{% for path in backup_paths %}  {{ path }} \
+{% endfor %}  >>"${LOG}" 2>&1
+code=$?
+set -e
+end=$(date +%s)
+duration=$((end - start))
+
+size=0
+snapshot=""
+if [ "${code}" -eq 0 ]; then
+  stats_json="$(restic stats latest --host {{ lab_hostname }} --tag scheduled --json 2>/dev/null || echo '{}')"
+  size="$(printf '%s' "${stats_json}" | jq -r '.total_size // 0')"
+  snapshot="$(restic snapshots --host {{ lab_hostname }} --tag scheduled --latest 1 --json 2>/dev/null | jq -r '.[0].short_id // ""')"
+fi
+
+success_ts=$(awk '/^sre_backup_last_success_timestamp_seconds / {print $2}' "$METRIC_FILE" 2>/dev/null || true)
+success_ts=${success_ts:-0}
+if [ "$code" -eq 0 ]; then
+  mv "$manifest" /var/lib/sre/restore.sha256
+  printf '%s\n' "$snapshot" > /var/lib/sre/verified-snapshot
+fi
+[ "${code}" -eq 0 ] && success_ts="${end}"
+
+cat >"${METRIC_FILE}.tmp" <<EOF
+# HELP sre_backup_last_success_timestamp_seconds Unix time of the last successful backup.
+# TYPE sre_backup_last_success_timestamp_seconds gauge
+sre_backup_last_success_timestamp_seconds ${success_ts}
+# HELP sre_backup_duration_seconds Duration of the last backup attempt.
+# TYPE sre_backup_duration_seconds gauge
+sre_backup_duration_seconds ${duration}
+# HELP sre_backup_size_bytes Size of the latest snapshot.
+# TYPE sre_backup_size_bytes gauge
+sre_backup_size_bytes ${size}
+# HELP sre_backup_last_exit_code Exit code of the last backup attempt.
+# TYPE sre_backup_last_exit_code gauge
+sre_backup_last_exit_code ${code}
+EOF
+
+chmod 644 "${METRIC_FILE}.tmp"
+mv "${METRIC_FILE}.tmp" "${METRIC_FILE}"
+
+printf '%s snapshot=%s duration=%ss size=%sB exit=%s\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${snapshot:-none}" "${duration}" "${size}" "${code}" \
+  >>"${LOG}"
+
+if [ "${code}" -ne 0 ]; then
+  echo "backup failed with exit code ${code}; see ${LOG}" >&2
+fi
+exit "${code}"

@@ -1,0 +1,15 @@
+# Managed by Ansible.
+#
+# Ubuntu cloud-init writes 50-cloud-init.conf. OpenSSH keeps the FIRST value it
+# sees for a keyword, so this file must sort before it to win. That is why it is
+# named 00- and not 99-.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+X11Forwarding no
+MaxAuthTries 4
+LoginGraceTime 20
+AllowUsers {{ lab_admin_user }}
+ClientAliveInterval 300
+ClientAliveCountMax 2

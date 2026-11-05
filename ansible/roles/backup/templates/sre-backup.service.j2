@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up SRE lab with restic
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sre-backup.sh
+Nice=10
+UMask=0077

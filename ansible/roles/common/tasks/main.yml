@@ -1,0 +1,136 @@
+---
+- name: Require a supported distribution
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version is version("24.04", ">=")
+    fail_msg: "This lab targets Ubuntu 24.04 or newer (got {{ ansible_distribution }} {{ ansible_distribution_version }})."
+    quiet: true
+
+- name: Update the apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ lab_packages }}"
+    state: present
+    autoremove: true
+
+- name: Read the current timezone
+  ansible.builtin.command: timedatectl show -p Timezone --value
+  register: current_timezone
+  changed_when: false
+
+- name: Set the timezone
+  ansible.builtin.command: "timedatectl set-timezone {{ lab_timezone }}"
+  when: current_timezone.stdout != lab_timezone
+
+- name: Enable NTP synchronisation
+  ansible.builtin.command: timedatectl set-ntp true
+  changed_when: false
+
+- name: Create the unprivileged application account
+  ansible.builtin.user:
+    name: "{{ lab_app_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    state: present
+
+- name: Create the application data tree
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ lab_app_user }}"
+    group: "{{ lab_app_user }}"
+    mode: "0750"
+  loop:
+    - /srv/app
+    - /srv/app/releases
+    - /srv/app/releases/v1
+
+- name: Seed application files (the backup/restore drill needs real content)
+  ansible.builtin.copy:
+    dest: "{{ item.dest }}"
+    content: "{{ item.content }}"
+    owner: "{{ lab_app_user }}"
+    group: "{{ lab_app_user }}"
+    mode: "0640"
+  loop:
+    - dest: /srv/app/state.txt
+      content: |
+        state=ready
+        version=1
+        owner=sreapp
+    - dest: /srv/app/config.json
+      content: |
+        {
+          "service": "sre-demo",
+          "listen": "127.0.0.1:9000",
+          "log_level": "info"
+        }
+    - dest: /srv/app/releases/v1/app.py
+      content: |
+        """Tiny placeholder release used to prove backups restore real code."""
+
+        def main() -> None:
+            print("sre-demo v1")
+
+
+        if __name__ == "__main__":
+            main()
+
+- name: Create systemd drop-in directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/systemd/journald.conf.d
+    - /etc/systemd/system/prometheus-node-exporter.service.d
+
+- name: Constrain the systemd journal
+  ansible.builtin.template:
+    src: journald-lab.conf.j2
+    dest: /etc/systemd/journald.conf.d/99-lab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
+- name: Apply kernel and network limits
+  ansible.builtin.template:
+    src: sysctl-lab.conf.j2
+    dest: /etc/sysctl.d/99-lab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Apply sysctl
+
+- name: Create the node_exporter textfile directory
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure node_exporter with the textfile collector
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/prometheus-node-exporter.service.d/10-lab.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart node_exporter
+
+- name: Enable node_exporter
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    enabled: true
+    state: started
+    daemon_reload: true

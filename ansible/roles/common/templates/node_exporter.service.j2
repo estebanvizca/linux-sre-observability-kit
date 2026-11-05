@@ -1,0 +1,5 @@
+[Service]
+# The Ubuntu package starts node_exporter without the textfile collector.
+# Backup and restore-drill scripts publish their state through this directory.
+ExecStart=
+ExecStart=/usr/bin/prometheus-node-exporter --collector.textfile.directory=/var/lib/node_exporter/textfile

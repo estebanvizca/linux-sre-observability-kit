@@ -1,0 +1,107 @@
+---
+- name: Create backup log and state directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - /var/log/sre
+    - /var/lib/sre
+
+- name: Write the restic environment file
+  ansible.builtin.template:
+    src: sre-backup.env.j2
+    dest: /etc/sre-backup.env
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install the backup script
+  ansible.builtin.template:
+    src: sre-backup.sh.j2
+    dest: /usr/local/sbin/sre-backup.sh
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the restore drill script
+  ansible.builtin.template:
+    src: sre-restore-drill.sh.j2
+    dest: /usr/local/sbin/sre-restore-drill.sh
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Write the restore manifest
+  ansible.builtin.template:
+    src: sre-restore-manifest.j2
+    dest: /etc/sre-restore-manifest
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the backup service
+  ansible.builtin.template:
+    src: sre-backup.service.j2
+    dest: /etc/systemd/system/sre-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the backup timer
+  ansible.builtin.template:
+    src: sre-backup.timer.j2
+    dest: /etc/systemd/system/sre-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Check whether the restic repository exists
+  ansible.builtin.shell: |
+    set -a
+    . /etc/sre-backup.env
+    set +a
+    restic cat config >/dev/null 2>&1
+  register: restic_repo_check
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Initialise the restic repository
+  ansible.builtin.shell: |
+    set -a
+    . /etc/sre-backup.env
+    set +a
+    restic init
+  when: restic_repo_check.rc != 0
+  no_log: true
+
+- name: Enable the daily backup timer
+  ansible.builtin.systemd:
+    name: sre-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Check whether the first backup already ran
+  ansible.builtin.stat:
+    path: /var/lib/sre/backup-bootstrapped
+  register: backup_marker
+
+- name: Take the first backup
+  ansible.builtin.systemd:
+    name: sre-backup.service
+    state: started
+  when: not backup_marker.stat.exists
+
+- name: Record that the first backup ran
+  ansible.builtin.file:
+    path: /var/lib/sre/backup-bootstrapped
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+  when: not backup_marker.stat.exists

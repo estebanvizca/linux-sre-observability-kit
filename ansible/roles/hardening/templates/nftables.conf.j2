@@ -1,0 +1,33 @@
+#!/usr/sbin/nft -f
+# Managed by Ansible.
+#
+# A dedicated table is used instead of "flush ruleset" so that fail2ban's
+# iptables-nft rules (and anything else on the host) are not wiped on reload.
+table inet sre_lab
+delete table inet sre_lab
+
+table inet sre_lab {
+    chain input {
+        type filter hook input priority filter; policy drop;
+
+        iif "lo" accept
+        ct state established,related accept
+        ct state invalid drop
+        ip protocol icmp accept
+        ip6 nexthdr ipv6-icmp accept
+
+        # Management SSH from the QEMU user-network gateway.
+        tcp dport 22 accept
+
+        # node_exporter is only reachable from the lab network, never the LAN.
+        ip saddr 10.0.2.0/24 tcp dport {{ node_exporter_port }} accept
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority filter; policy accept;
+    }
+}

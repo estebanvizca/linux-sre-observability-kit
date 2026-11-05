@@ -1,0 +1,45 @@
+---
+# Variables shared by every role. Secrets are read from the ignored .cache
+# directory on the control node and never stored in this file.
+
+lab_admin_user: sre
+lab_app_user: sreapp
+lab_timezone: UTC
+lab_hostname: sre-lab
+
+# The guest reaches the operator host through QEMU's user-mode gateway.
+monitoring_host: 10.0.2.2
+node_exporter_port: 9100
+loki_port: 3100
+
+# Promtail is published as a static binary; pin the version for reproducibility.
+promtail_version: "3.3.2"
+promtail_arch: amd64
+
+# restic repository hosted on the operator machine (rest-server container).
+restic_repository: "rest:http://10.0.2.2:18000/"
+restic_password: "{{ lookup('file', playbook_dir + '/../../.cache/secrets/restic-password') }}"
+restic_rest_username: sre
+restic_rest_password: "{{ lookup('file', playbook_dir + '/../../.cache/secrets/rest-server-password') }}"
+
+backup_paths:
+  - /etc
+  - /home
+  - /srv
+  - /var/log
+backup_excludes:
+  - /etc/sre-backup.env
+  - /var/log/journal
+  - /var/cache
+  - /var/log/sre
+  - /var/lib/promtail
+
+# Files compared after a restore. Keep this list small and meaningful.
+restore_manifest:
+  - /etc/hostname
+  - /etc/nftables.conf
+  - /etc/ssh/sshd_config.d/00-lab-hardening.conf
+  - /etc/systemd/system/sre-backup.timer
+  - /srv/app/state.txt
+  - /srv/app/config.json
+  - /srv/app/releases/v1/app.py

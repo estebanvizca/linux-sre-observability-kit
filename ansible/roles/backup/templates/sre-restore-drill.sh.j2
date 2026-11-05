@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Restore only into an isolated temporary directory; never overwrite live data.
+set -euo pipefail
+umask 077
+set -a
+. /etc/sre-backup.env
+set +a
+exec 9>/var/lib/sre/backup.lock
+flock -n 9 || { echo "Another backup or restore is running" >&2; exit 1; }
+work=$(mktemp -d /var/lib/sre/restore.XXXXXX)
+metric=/var/lib/node_exporter/textfile/restore.prom
+start=$(date +%s)
+success=0
+finish() {
+  code=$?
+  printf 'sre_restore_success %s\nsre_restore_duration_seconds %s\n' \
+    "$success" "$(($(date +%s) - start))" > "$metric.tmp"
+  chmod 644 "$metric.tmp"
+  mv "$metric.tmp" "$metric"
+  rm -rf -- "$work"
+  exit "$code"
+}
+trap finish EXIT
+# Snapshot identity and expected hashes belong to the same backup transaction.
+snapshot=$(cat /var/lib/sre/verified-snapshot)
+restic restore "$snapshot" --target "$work" --verify
+(cd "$work" && sha256sum --check /var/lib/sre/restore.sha256)
+success=1
+echo "Restore verified: $snapshot"

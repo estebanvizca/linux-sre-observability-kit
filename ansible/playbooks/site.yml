@@ -1,0 +1,11 @@
+---
+- name: Provision the disposable SRE lab
+  hosts: all
+  become: true
+  vars_files:
+    - ../group_vars/all.yml
+  roles:
+    - common
+    - hardening
+    - observability
+    - backup
